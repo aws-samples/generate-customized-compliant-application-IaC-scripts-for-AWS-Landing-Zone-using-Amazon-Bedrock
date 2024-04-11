@@ -1,0 +1,245 @@
+{
+  "TerraformModules":  [
+    {
+      "ModuleName": "ec2-instance",
+      "ModuleSource": "org/ec2/aws",
+      "Description": "Provisions EC2 instances, allowing for customizable computing capacity.",
+      "RequiredParameters": ["instance_type", "ami", "count"],
+      "Dependencies": ["vpc", "security-group"],
+      "ConditionalLogic": "If 'instance_type' is 't2.micro', consider enabling T2/T3 Unlimited to avoid CPU credits exhaustion for burstable instances.",
+      "BestPractices": "Use the latest AMI for enhanced security. Enable detailed monitoring for better performance insights.",
+      "SecurityNotes": "Ensure instances are placed in private subnets if not needing direct internet access. Limit SSH access to known IPs.",
+      "Environments": {
+        "Sandbox": {
+          "ami": "ami-12345678",
+          "instance_type": ["t2.micro", "t2.small"],
+          "golden_ami": "ami-sandbox1234"
+        },
+        "Prod": {
+          "ami": "ami-87654321",
+          "instance_type": ["t2.large", "t2.xlarge"],
+          "golden_ami": "ami-prod1234"
+        },
+        "Dev": {
+          "ami": "ami-11223344",
+          "instance_type": ["t2.medium"],
+          "golden_ami": "ami-dev1234"
+        }
+      }
+    },
+    {
+      "ModuleName": "rds",
+      "ModuleSource": "org/rds/aws",
+      "Description": "Deploys RDS instances for managed relational database services with various DB engines.",
+      "RequiredParameters": ["instance_class", "engine", "username", "password"],
+      "Dependencies": ["vpc", "db-subnet-group"],
+      "ConditionalLogic": "Use multi-AZ deployment for production workloads to ensure high availability.",
+      "BestPractices": "Encrypt database instances at rest and enable automatic backups.",
+      "SecurityNotes": "Use IAM database authentication for enhanced security. Regularly rotate credentials.",
+      "Environments": {
+        "Sandbox": {
+          "instance_class": "db.t2.micro",
+          "engine": ["MySQL", "PostgreSQL"]
+        },
+        "Prod": {
+          "instance_class": "db.m4.large",
+          "engine": ["Oracle", "SQLServer"]
+        },
+        "Dev": {
+          "instance_class": "db.t2.small",
+          "engine": ["MySQL", "MariaDB"]
+        }
+      }
+    },
+    {
+      "ModuleName": "s3-bucket",
+      "ModuleSource": "org/s3/aws",
+      "Description": "Creates S3 buckets for object storage to store and protect any amount of data.",
+      "RequiredParameters": ["bucket"],
+      "Dependencies": [],
+      "ConditionalLogic": "If storing sensitive data, enable encryption.",
+      "BestPractices": "Enable versioning to recover from accidental deletes or overwrites. Use lifecycle policies to manage object lifetimes.",
+      "SecurityNotes": "Apply least privilege access control. Enable MFA delete capability to protect against accidental data loss."
+    },
+    {
+      "ModuleName": "vpc",
+      "ModuleSource": "org/vpc/aws",
+      "Description": "Sets up a Virtual Private Cloud for provisioning a logically isolated section of the AWS Cloud.",
+      "RequiredParameters": ["cidr_block"],
+      "Dependencies": [],
+      "ConditionalLogic": "Consider creating multiple subnets for different availability zones to ensure high availability.",
+      "BestPractices": "Use NACLs and Security Groups to enforce in-depth network security. Enable flow logs for network traffic monitoring.",
+      "SecurityNotes": "Restrict unused ports and ensure that only necessary traffic is allowed."
+    },
+    {
+      "ModuleName": "iam-role",
+      "ModuleSource": "org/iam/aws",
+      "Description": "Provisions IAM roles to securely control access to AWS services and resources.",
+      "RequiredParameters": ["name", "assume_role_policy"],
+      "Dependencies": [],
+      "ConditionalLogic": "Attach policies according to the principle of least privilege.",
+      "BestPractices": "Regularly audit IAM roles and attached policies for unnecessary permissions.",
+      "SecurityNotes": "Use condition elements in IAM policies to enforce MFA authentication."
+    },
+    {
+      "ModuleName": "elastic-load-balancer",
+      "ModuleSource": "org/elb/aws",
+      "Description": "Deploys Elastic Load Balancers to automatically distribute incoming application traffic across multiple targets.",
+      "RequiredParameters": ["name", "subnets"],
+      "Dependencies": ["vpc"],
+      "ConditionalLogic": "If deploying within a VPC, ensure subnets are specified.",
+      "BestPractices": "Enable access logs for diagnosing issues. Use SSL certificates to secure data in transit.",
+      "SecurityNotes": "Restrict access to trusted sources only using security groups."
+    },
+    {
+      "ModuleName": "auto-scaling",
+      "ModuleSource": "org/autoscaling/aws",
+      "Description": "Automatically adjusts the number of instances in response to traffic demands.",
+      "RequiredParameters": ["launch_configuration", "min_size", "max_size"],
+      "Dependencies": ["ec2-instance", "launch-configuration"],
+      "ConditionalLogic": "For high availability, span Auto Scaling groups across multiple Availability Zones.",
+      "BestPractices": "Use health check replacements to replace unhealthy instances automatically.",
+      "SecurityNotes": "Ensure instances use IAM roles with minimum necessary permissions."
+    },
+    {
+      "ModuleName": "dynamodb",
+      "ModuleSource": "org/dynamodb/aws",
+      "Description": "Provides fast and flexible NoSQL database service for all applications that need consistent, single-digit millisecond latency at any scale.",
+      "RequiredParameters": ["name"],
+      "Dependencies": [],
+      "ConditionalLogic": "Consider DynamoDB Accelerator (DAX) for read-intensive applications.",
+      "BestPractices": "Use provisioned capacity with auto scaling to manage costs effectively.",
+      "SecurityNotes": "Encrypt data at rest using DynamoDB encryption."
+    },
+    {
+      "ModuleName": "lambda",
+      "ModuleSource": "org/lambda/aws",
+      "Description": "Runs code in response to triggers such as changes in data or system state, managing the computing resources automatically.",
+      "RequiredParameters": ["function_name", "handler", "runtime"],
+      "Dependencies": ["iam-role"],
+      "ConditionalLogic": "If the Lambda function interacts with other AWS services, ensure the IAM role has the necessary permissions.",
+      "BestPractices": "Use environment variables for configuration. Monitor function execution with CloudWatch.",
+      "SecurityNotes": "Follow the principle of least privilege when assigning IAM roles to functions."
+    },
+    {
+      "ModuleName": "api-gateway",
+      "ModuleSource": "org/api-gateway/aws",
+      "Description": "Offers a robust, secure, and scalable way to create, publish, maintain, monitor, and secure APIs at any scale.",
+      "RequiredParameters": ["name", "protocol_type"],
+      "Dependencies": ["lambda"],
+      "ConditionalLogic": "For REST APIs, integrate with Lambda for backend service.",
+      "BestPractices": "Implement throttling to protect backend services from overload.",
+      "SecurityNotes": "Use API keys and resource policies to secure access."
+    },
+    {
+      "ModuleName": "security-group",
+      "ModuleSource": "org/security-group/aws",
+      "Description": "Defines a security group for AWS to control inbound and outbound traffic to AWS resources and applications. Security groups act as a virtual firewall for instances to control inbound and outbound traffic.",
+      "RequiredParameters": ["name", "vpc_id", "ingress", "egress"],
+      "Dependencies": ["vpc"],
+      "ConditionalLogic": "For web servers, define ingress rules to allow HTTP and HTTPS traffic. For database servers, restrict ingress to specific IP ranges.",
+      "BestPractices": "Define security groups with the least privilege access principle. Minimize the use of open ingress rules (e.g., 0.0.0.0/0). Regularly review and revise security group rules to remove unused or unnecessary permissions.",
+      "SecurityNotes": "Avoid using stateful egress rules that allow all outbound traffic by default. Instead, specify necessary outbound traffic requirements. Use security group references in ingress and egress rules to restrict traffic flow between services within a VPC."
+    },
+    {
+      "ModuleName": "cloudfront",
+      "ModuleSource": "org/cloudfront/aws",
+      "Description": "Distributes content globally with low latency and high transfer speeds, integrating with AWS services securely.",
+      "RequiredParameters": ["distribution_config"],
+      "Dependencies": ["s3-bucket", "acm-certificate"],
+      "ConditionalLogic": "Use an S3 bucket for origin if distributing static content.",
+      "BestPractices": "Use SSL certificates (ACM) to secure content delivery.",
+      "SecurityNotes": "Restrict bucket access to CloudFront using Origin Access Identity (OAI)."
+    },
+    {
+      "ModuleName": "route53",
+      "ModuleSource": "org/route53/aws",
+      "Description": "A highly available and scalable Domain Name System (DNS) web service, designed to give developers a reliable way to route end users to Internet applications.",
+      "RequiredParameters": ["name", "type", "records", "zone_id"],
+      "Dependencies": [],
+      "ConditionalLogic": "Use alias records for routing to AWS resources without charging for DNS queries.",
+      "BestPractices": "Leverage health checks to route traffic to healthy endpoints.",
+      "SecurityNotes": "Enable DNSSEC for domains to secure DNS traffic."
+    },
+    {
+      "ModuleName": "sqs",
+      "ModuleSource": "org/sqs/aws",
+      "Description": "Offers a secure, durable, and available hosted queue that lets you integrate and decouple distributed software systems and components.",
+      "RequiredParameters": ["name"],
+      "Dependencies": [],
+      "ConditionalLogic":"Use standard queues for maximum throughput and at-least-once delivery, or FIFO queues for ordering and exactly-once processing.",
+      "BestPractices": "Monitor queue metrics with CloudWatch to scale consumers based on workload.",
+      "SecurityNotes": "Encrypt messages in transit and at rest to protect sensitive data."
+    },
+    {
+      "ModuleName": "sns",
+      "ModuleSource": "org/sns/aws",
+      "Description": "Provides a fully managed messaging service for both application-to-application (A2A) and application-to-person (A2P) communication.",
+      "RequiredParameters": ["name"],
+      "Dependencies": [],
+      "ConditionalLogic": "Use with SQS for decoupled message processing architecture.",
+      "BestPractices": "Use topic filtering options to route messages to relevant subscribers.",
+      "SecurityNotes": "Restrict publish/subscribe permissions to trusted entities."
+    },
+    {
+      "ModuleName": "iam-policy",
+      "ModuleSource": "org/iam/aws",
+      "Description": "Defines permissions for action on AWS resources, allowing you to specify access controls.",
+      "RequiredParameters": ["name", "policy"],
+      "Dependencies": ["iam-role"],
+      "ConditionalLogic": "Attach to IAM roles or users depending on the use case for granular access control.",
+      "BestPractices": "Adhere to the principle of least privilege by granting only necessary permissions.",
+      "SecurityNotes": "Regularly review and update policies to ensure they adhere to current security standards."
+    },
+    {
+      "ModuleName": "ecs",
+      "ModuleSource": "org/ecs/aws",
+      "Description": "A highly scalable, fast container management service that makes it easy to run, stop, and manage Docker containers on a cluster.",
+      "RequiredParameters": ["cluster_name"],
+      "Dependencies": ["iam-role", "ec2-instance"],
+      "ConditionalLogic": "Use Fargate launch type for serverless infrastructure or EC2 launch type for more control.",
+      "BestPractices": "Define task definitions with CPU and memory configurations for efficient resource utilization.",
+      "SecurityNotes": "Use IAM roles for tasks to provide AWS API access to containers securely."
+    },
+    {
+      "ModuleName": "eks",
+      "ModuleSource": "org/eks/aws",
+      "Description": "Provides a managed Kubernetes service that makes it easier for you to run Kubernetes on AWS without needing to install and operate your own Kubernetes clusters.",
+      "RequiredParameters": ["name", "version"],
+      "Dependencies": ["vpc", "iam-role"],
+      "ConditionalLogic": "Consider enabling IAM roles for service accounts (IRSA) for fine-grained access control.",
+      "BestPractices": "Enable logging and monitoring with CloudWatch for operational efficiency.",
+      "SecurityNotes": "Regularly update Kubernetes clusters and nodes to the latest versions to ensure security."
+    },
+    {
+      "ModuleName": "cloudwatch",
+      "ModuleSource": "org/cloudwatch/aws",
+      "Description": "Provides monitoring and observability of your AWS resources and applications on AWS and on-premises.",
+      "RequiredParameters": ["name", "metric_queries"],
+      "Dependencies": [],
+      "ConditionalLogic": "Use alarms to automate actions based on metrics thresholds.",
+      "BestPractices": "Log API calls with CloudTrail for audit and historical purposes.",
+      "SecurityNotes": "Control access by using IAM policies attached to users, groups, and roles."
+    },
+    {
+      "ModuleName": "kms",
+      "ModuleSource": "org/kms/aws",
+      "Description": "Allows you to create and manage cryptographic keys and control their use across a wide range of AWS services and in your applications.",
+      "RequiredParameters": ["key_policy"],
+      "Dependencies": [],
+      "ConditionalLogic": "Use AWS managed keys for default services or customer managed keys for more control.",
+      "BestPractices": "Rotate keys regularly to enhance security.",
+      "SecurityNotes": "Restrict key usage permissions to only trusted roles and users."
+    },
+    {
+      "ModuleName": "codebuild",
+      "ModuleSource": "org/codebuild/aws",
+      "Description": "Compiles source code, runs tests, and produces software packages that are ready to deploy.",
+      "RequiredParameters": ["name", "source"],
+      "Dependencies": ["iam-role"],
+      "ConditionalLogic": "Integrate with CodePipeline for continuous integration and continuous delivery (CI/CD).",
+      "BestPractices": "Use buildspec.yml to define build commands and the build environment.",
+      "SecurityNotes": "Use VPC endpoints to keep traffic within the AWS network when accessing sources."
+    }
+]  
+}
